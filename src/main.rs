@@ -1,10 +1,10 @@
 use std::path::{Path, PathBuf};
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use chrono::{Date, Datelike, Local};
-use dialoguer::Input;
 use glob::glob;
 use raf::option::RafConfig;
+use rustyline::{error::ReadlineError, Editor};
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
@@ -37,28 +37,46 @@ fn main() -> Result<()> {
 
     match args {
         Args::New { kind, slug } => {
-            let kind: String = kind.unwrap_or_else(|| {
-                Input::new()
-                    .with_prompt("Project kind")
-                    .interact_text()
-                    .unwrap()
-            });
-            let slug: String = slug.unwrap_or_else(|| {
-                Input::new()
-                    .with_prompt("Project slug")
-                    .interact_text()
-                    .unwrap()
-            });
+            let mut rl = Editor::<()>::new();
+            let kind = if let Some(kind) = kind {
+                kind
+            } else {
+                let readline = rl.readline("Project kind: ");
+                match readline {
+                    Ok(kind) => kind,
+                    Err(ReadlineError::Interrupted | ReadlineError::Eof) => {
+                        return Err(anyhow!("Interrupted!"))
+                    }
+                    _ => return Err(anyhow!("Unknown error.")),
+                }
+            };
+            let slug = if let Some(slug) = slug {
+                slug
+            } else {
+                let readline = rl.readline("Project slug: ");
+                match readline {
+                    Ok(slug) => slug,
+                    Err(ReadlineError::Interrupted | ReadlineError::Eof) => {
+                        return Err(anyhow!("Interrupted!"))
+                    }
+                    _ => return Err(anyhow!("Unknown error.")),
+                }
+            };
             let new_dir = create_new_dir(&raf_root, &kind, &today, &slug)?;
             println!("{}", new_dir.to_str().unwrap());
         }
         Args::Ls => {
             let str_root = raf_root.to_str().unwrap();
             let g = glob(&format!("{}/*/*/*/*/*", str_root))?;
-            for p in g {
-                if let Some(s) = p.ok().and_then(|p| p.to_str().map(|s| s.to_owned())) {
-                    println!("{}", s);
+            let print_func = |p: PathBuf| {
+                let fname = p.file_name()?.to_str()?;
+                if !fname.starts_with('.') {
+                    println!("{}", p.to_str()?);
                 }
+                Some(())
+            };
+            for p in g.flatten() {
+                print_func(p);
             }
         }
     }
