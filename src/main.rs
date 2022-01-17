@@ -37,7 +37,10 @@ fn main() -> Result<()> {
 
     match args {
         Args::New { kind, slug } => {
-            let mut rl = Editor::<()>::new();
+            let config = rustyline::config::Builder::new()
+                .output_stream(rustyline::OutputStreamType::Stderr)
+                .build();
+            let mut rl = Editor::<()>::with_config(config);
             let kind = if let Some(kind) = kind {
                 kind
             } else {
