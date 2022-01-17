@@ -26,7 +26,7 @@ fn main() -> Result<()> {
     std::env::set_var("RUST_LOG", "info");
     env_logger::init();
 
-    let raf_config_root = format!("{}/.raf/config.toml", std::env::var("HOME").unwrap());
+    let raf_config_root = format!("{}/.config/raf/config.toml", std::env::var("HOME").unwrap());
     let raf_config_root = Path::new(&raf_config_root);
     let raf_config_root = std::fs::read_to_string(raf_config_root)?;
     let raf_config: RafConfig = toml::from_str(&raf_config_root)?;
