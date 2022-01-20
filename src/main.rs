@@ -1,24 +1,25 @@
 use std::path::{Path, PathBuf};
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use chrono::{Date, Datelike, Local};
+use clap::Parser;
 use glob::glob;
 use raf::option::RafConfig;
 use rustyline::{error::ReadlineError, Editor};
-use structopt::StructOpt;
 
-#[derive(Debug, StructOpt)]
+#[derive(Debug, Parser)]
 /// Draw your rough draft freely.
 enum Args {
-    /// Create a new draft file and output the path of it.
+    /// Create a new draft directory and output the path of it.
     New {
         /// project type.
-        #[structopt(short, long)]
+        #[clap(short, long)]
         kind: Option<String>,
         /// project slug.
-        #[structopt(short, long)]
+        #[clap(short, long)]
         slug: Option<String>,
     },
+    /// List up all draft directories under the root raf directory.
     Ls,
 }
 
@@ -28,11 +29,12 @@ fn main() -> Result<()> {
 
     let raf_config_root = format!("{}/.config/raf/config.toml", std::env::var("HOME").unwrap());
     let raf_config_root = Path::new(&raf_config_root);
-    let raf_config_root = std::fs::read_to_string(raf_config_root)?;
+    let raf_config_root = std::fs::read_to_string(raf_config_root)
+        .with_context(|| anyhow!("Failed to load {:?}", raf_config_root))?;
     let raf_config: RafConfig = toml::from_str(&raf_config_root)?;
     let raf_root = raf_config.path.root;
 
-    let args = Args::from_args();
+    let args = Args::parse();
     let today = Local::today();
 
     match args {

@@ -1,3 +1,5 @@
+//! raf: create rough draft project at any time
+
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 #![warn(rust_2018_idioms)]

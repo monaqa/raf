@@ -8,7 +8,6 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0.37"
-structopt = "0.3.21"
 itertools = "0.10.0"
 serde = { version = "1.0.118", features = ["derive"] }
 toml = "0.5.8"
@@ -17,3 +16,4 @@ chrono = "0.4.19"
 log = "0.4.11"
 env_logger = "0.8.2"
 rustyline = "9.1.2"
+clap = { version = "3.0.10", features = ["derive"] }
