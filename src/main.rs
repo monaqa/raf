@@ -3,7 +3,10 @@ use std::path::{Path, PathBuf};
 use anyhow::{anyhow, Context, Result};
 use chrono::{Date, Datelike, Local};
 use clap::Parser;
+use dialoguer::console::Term;
+use fs_extra::dir::CopyOptions;
 use glob::glob;
+use itertools::Itertools;
 use raf::option::RafConfig;
 use rustyline::{error::ReadlineError, Editor};
 
@@ -18,6 +21,9 @@ enum Args {
         /// project slug.
         #[clap(short, long)]
         slug: Option<String>,
+        /// template path.
+        #[clap(short, long)]
+        template: Option<String>,
     },
     /// List up all draft directories under the root raf directory.
     Ls,
@@ -38,7 +44,11 @@ fn main() -> Result<()> {
     let today = Local::today();
 
     match args {
-        Args::New { kind, slug } => {
+        Args::New {
+            kind,
+            slug,
+            template,
+        } => {
             let config = rustyline::config::Builder::new()
                 .output_stream(rustyline::OutputStreamType::Stderr)
                 .build();
@@ -55,6 +65,44 @@ fn main() -> Result<()> {
                     _ => return Err(anyhow!("Unknown error.")),
                 }
             };
+
+            let template_dir = if let Some(template) = template {
+                let template_dir = raf_config.path.template.join(template);
+                if template_dir.is_dir() {
+                    Some(template_dir)
+                } else {
+                    eprintln!("[WARN] template directory '{template_dir:?}' not found. createing empty directory.");
+                    None
+                }
+            } else {
+                let g = glob(&format!(
+                    "{}/{kind}/*",
+                    raf_config.path.template.to_str().unwrap()
+                ))?;
+                let items = g.flatten().map(|p| p.to_str().unwrap().to_owned());
+                let mut items = Some("Do not use template".to_string())
+                    .into_iter()
+                    .chain(items)
+                    .collect_vec();
+                if items.len() > 1 {
+                    eprintln!("Select template to use:");
+                    let selection = dialoguer::Select::new()
+                        .items(&items)
+                        .default(0)
+                        .interact_on_opt(&Term::stderr())?;
+                    match selection {
+                        Some(selection) if selection > 0 => {
+                            let path = items.swap_remove(selection);
+                            eprintln!("Uses template {path}");
+                            Some(PathBuf::from(path))
+                        }
+                        _ => None,
+                    }
+                } else {
+                    None
+                }
+            };
+
             let slug = if let Some(slug) = slug {
                 slug
             } else {
@@ -67,8 +115,14 @@ fn main() -> Result<()> {
                     _ => return Err(anyhow!("Unknown error.")),
                 }
             };
-            let new_dir = create_new_dir(&raf_root, &kind, &today, &slug)?;
-            println!("{}", new_dir.to_str().unwrap());
+
+            if let Some(template_dir) = template_dir {
+                let new_dir = copy_template(&raf_root, &kind, &template_dir, &today, &slug)?;
+                println!("{}", new_dir.to_str().unwrap());
+            } else {
+                let new_dir = create_new_dir(&raf_root, &kind, &today, &slug)?;
+                println!("{}", new_dir.to_str().unwrap());
+            }
         }
         Args::Ls => {
             let str_root = raf_root.to_str().unwrap();
@@ -105,6 +159,44 @@ fn create_new_dir(root: &Path, ftype: &str, date: &Date<Local>, fname: &str) -> 
         std::fs::create_dir_all(&fpath)?;
     };
     // std::fs::File::create(&fpath).expect("Cannot create.");
+
+    Ok(fpath)
+}
+
+fn copy_template(
+    root: &Path,
+    ftype: &str,
+    template_dir: &Path,
+    date: &Date<Local>,
+    fname: &str,
+) -> Result<PathBuf> {
+    let fpath = format!(
+        "{ftype:}/{year:04}/{month:02}/{day:02}/{fname:}",
+        ftype = ftype,
+        year = date.year(),
+        month = date.month(),
+        day = date.day(),
+        fname = fname
+    );
+    let fpath = Path::new(&fpath);
+    let fpath = root.join(fpath);
+
+    let parent_dir = fpath.parent().expect("cannot find parent directory");
+
+    if !parent_dir.exists() {
+        std::fs::create_dir_all(parent_dir)?;
+    };
+    // std::fs::File::create(&fpath).expect("Cannot create.");
+    fs_extra::dir::copy(
+        template_dir,
+        &fpath,
+        &CopyOptions {
+            overwrite: true,
+            skip_exist: true,
+            copy_inside: true,
+            ..Default::default()
+        },
+    )?;
 
     Ok(fpath)
 }

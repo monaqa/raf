@@ -16,6 +16,6 @@ pub struct RafConfig {
 pub struct RafConfigPath {
     /// raf のルートディレクトリ。
     pub root: PathBuf,
-    // /// template 置き場。
-    // pub template: PathBuf,
+    /// template 置き場。
+    pub template: PathBuf,
 }
